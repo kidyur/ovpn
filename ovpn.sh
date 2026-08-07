@@ -1,7 +1,5 @@
 #!/bin/bash
 
-IP=192.168.0.0
-USER=root
 
 list() {
 	ssh ${USER}@${IP} " \
@@ -9,7 +7,7 @@ list() {
 }
 
 add_user() {
-	CFG_NAME=$1
+	CFG_NAME=$2
 	
 	if [[ -z "${CFG_NAME}" ]]; then
 		echo "Please provide the users name as an argument"
@@ -23,7 +21,7 @@ add_user() {
 }
 
 revoke_user() {
-	CFG_NAME=$1
+	CFG_NAME=$2
 
 	if [[ -z "${CFG_NAME}" ]]; then
 		echo "Please provide the users name as an argument"
@@ -39,6 +37,9 @@ revoke_user() {
 
 COMMAND=$1
 ARGS=$@
+IP=192.168.0.0
+USER=root
+
 
 if [[ ${COMMAND} = "--list" ]]; then
 	list
