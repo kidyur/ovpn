@@ -25,3 +25,7 @@ It will list all the active vpn clients
 ## --revoke 
 `ovpn.sh --revoke CLIENTNAME`
 It will revoke one of the vpn clients. 
+
+# FILES
+`~/.ovpncfg` - path to the user's configuration
+`~/.ovpndat` - path to the data file with the user's servers
