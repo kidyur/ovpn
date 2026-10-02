@@ -3,7 +3,7 @@
 # CONSTANTS
 EXIT_FAILURE=1
 EXIT_SUCCESS=0
-SCRIPT_NAME=$0
+PATH_TO_SCRIPT=$0
 PATH_TO_CONFIG=~/.ovpncfg
 PATH_TO_DATA=~/.ovpndat
 
@@ -15,6 +15,20 @@ PATH_TO_SERVER_SCRIPT=""
 
 # Server management
 add_server() {
+	if [ "$1" = "-h" ]; then
+		cat << EOF
+		$PATH_TO_SCRIPT add-server <srv_name> <ip> <user> <path_to_script>
+
+		<srv_name>       - to distinguish the server in the list easily
+		<ip>             - the ipv4 address of your server
+		<user>           - user's name for connection
+		<path_to_script> - path to the 'openvpn-install.sh' script on the server 
+
+		short: revokes the user's certificate and removes his config file
+		       from the server.
+EOF
+		exit $EXIT_SUCCESS
+	fi
 	_NAME="$1"
 	_IP="$2"
 	_USER="$3"
@@ -61,16 +75,25 @@ check_server_config() {
 }
 
 remove_server() {
+	if [ "$1" = "-h" ]; then
+		cat << EOF
+		$PATH_TO_SCRIPT remove-server <srv_name> <user>
+
+		short: removes the pair <server_name, user> from the list
+		(see '$PATH_TO_SCRIPT list-servers' to see the list)
+EOF
+		exit $EXIT_SUCCESS
+	fi
 	_NAME="$1"
 	_USER="$2"	
 
 	if [ -z $_NAME ] || [ -z $_USER ]; then
 		echo "ERROR: provide correct server's name and its user!"
-		exit EXIT_FAILURE
+		exit $EXIT_FAILURE
 	fi
 	
 	awk -v server_name=$_NAME -v user=$_USER '
-	{
+	NR > 1 {
 		if ($1 == server_name && $2 == user) {
 			next
 		} else {
@@ -82,16 +105,25 @@ remove_server() {
 }
 
 switch_server() {
+	if [ "$1" = "-h" ]; then
+		cat << EOF
+		$PATH_TO_SCRIPT switch-server <srv_name> <user>
+
+		short: sets server's credentials to the configuration file 
+		(see '$PATH_TO_SCRIPT credentials' command)
+EOF
+		exit $EXIT_SUCCESS
+	fi
 	_NAME="$1"
 	_USER="$2"
 
 	if [ -z $_NAME ] || [ -z $_USER ]; then
 		echo "ERROR: provide correct server's name and its user!"
-		exit EXIT_FAILURE
+		exit $EXIT_FAILURE
 	fi
 
 	resolve_data_file
-	CONFIG="$(awk -v user=$_USER -v srvname=$_NAME '$1 == srvname && $2 == user' $PATH_TO_DATA)"
+	CONFIG="$(awk -v user=$_USER -v srvname=$_NAME '$1 = srvname && $2 == user' $PATH_TO_DATA)"
 	if [ -z "$CONFIG" ]; then
 		echo "ERROR: there is no such server."
 	else
@@ -100,13 +132,13 @@ switch_server() {
 		_PATH_TO_SCRIPT="$(echo "$CONFIG" | awk '{ print $4 }')"
 		awk -v srvname=$_NAME -v username=$_USER -v ip=$_IP -v path_to_script=$_PATH_TO_SCRIPT '
 			{
-				if ($1 == "SERVER_NAME") {
+				if ($1 = "SERVER_NAME") {
 					printf "SERVER_NAME %s\n", srvname		
-				} else if ($1 == "USER") {
+				} else if ($1 = "USER") {
 					printf "USER %s\n", username
-				} else if ($1 == "IPv4_ADDRESS") {
+				} else if ($1 = "IPv4_ADDRESS") {
 					printf "IPv4_ADDRESS %s\n", ip
-				} else if ($1 == "PATH_TO_SCRIPT") {
+				} else if ($1 = "PATH_TO_SCRIPT") {
 					printf "PATH_TO_SCRIPT %s\n", path_to_script	
 				} else {
 					next
@@ -125,14 +157,22 @@ get_credentials() {
 	USER="$(awk '$1 == "USER" { print $2; exit }' $PATH_TO_CONFIG)"
 	PATH_TO_SERVER_SCRIPT="$(awk '$1 == "PATH_TO_SCRIPT" { print $2; exit }' $PATH_TO_CONFIG)"
 
-	if [ -z $SERVER_NAME ] || [ -z $IP ] || [ -z $USER ] || [ -z PATH_TO_SERVER_SCRIPT ]; then
+	if [ -z $SERVER_NAME ] || [ -z $IP ] || [ -z $USER ] || [ -z $PATH_TO_SERVER_SCRIPT ]; then
 		echo "ERROR: You have the wrong credentials configured.\nCheck your config file via '$PATH_TO_SCRIPT config' command"
 		exit $EXIT_FAILURE
 	fi
 }
 
 # Commands for executing on the server
-list() {
+list_users() {
+	if [ "$1" = "-h" ]; then
+		cat << EOF
+		$PATH_TO_SCRIPT list-users
+
+		short: lists all the certificates from the current server
+EOF
+		exit $EXIT_SUCCESS
+	fi
 	get_credentials
 	ssh $USER@$IP " \
 		$PATH_TO_SERVER_SCRIPT client list" 
@@ -140,19 +180,36 @@ list() {
 
 
 add_user() {
+	if [ "$1" = "-h" ]; then
+		cat << EOF
+		$PATH_TO_SCRIPT add-user <name>
+
+		short: creates the certificate and downloads config file
+		       to the ~/Downloads/example-config.ovpn 
+EOF
+		exit $EXIT_SUCCESS
+	fi
 	get_credentials
 	_NAME="$1"	
 
 	if [ -z $_NAME ]; then
 		echo "Please provide the user's name as an argument"
 	else
-		ssh $USER@$IP " \
-			$PATH_TO_SERVER_SCRIPT client add $_NAME &>/dev/null && \ 
-			cat $NAME.ovpn" > $NAME.ovpn 
+		ssh $USER@$IP \
+		"$PATH_TO_SERVER_SCRIPT client add $_NAME &>/dev/null && cat $_NAME.ovpn" > ~/Downloads/$_NAME.ovpn 
 	fi
 }
 
 revoke_user() {
+	if [ "$1" = "-h" ]; then
+		cat << EOF
+		$PATH_TO_SCRIPT revoke-user <name>
+
+		short: revokes the user's certificate and removes his config file
+		       from the server.
+EOF
+		exit $EXIT_SUCCESS
+	fi
 	_NAME="$1"
 	get_credentials
 
@@ -165,17 +222,32 @@ revoke_user() {
 }
 
 help() {
-	echo "
-	USAGE: $ ./ovpn.sh CMD [ARGUMENTS]
-	CMDS:
-		--add [ARG1]    - adds a new vpn client with name=ARG1 and 
-				  copies his .ovpn file to your local machine
-		--list          - shows all active vpn clients
-		--revoke [ARG1] - revokes client with name=ARG1"
+	cat << EOF
+	ovpn
+		$PATH_TO_SCRIPT command <arg1>..<argn>
+		
+		use '$PATH_TO_SCRIPT command -h' to see the details 
+	
+	commands:
+	[configuration]
+		cs | credentials
+		
+	[server-management]	
+		ls | list-servers  
+		as | add-server    
+		rs | remove-server 
+		ss | switch-server
+
+	[user-management]
+		au | add-user  
+		ru | revoke-user 
+		lu | list-users
+EOF
+		exit $EXIT_SUCCESS
 }
 
 error_msg() {	
-	echo "Unknown command. Use '${SCRIPT_NAME} -h' to see the manual."
+	echo "Unknown command. Use '$PATH_TO_SCRIPT -h' to see the manual."
 }
 
 show_credentials() {
@@ -190,25 +262,30 @@ list_servers() {
 }
 
 main() {
+	if [ $# -eq 0 ]; then
+		help	
+		exit $EXIT_SUCCESS
+	fi
+
 	CMD="$1"	
 	shift
 	ARGS="$@"
 	case $CMD in 
-		credentials)
+		cs|credentials)
 			show_credentials ;;
-		list)
+		lu|list-users)
 			list_users $ARGS ;;
-		add)
+		au|add-user)
 			add_user $ARGS ;;
-		revoke) 
+		ru|revoke-user) 
 			revoke_user $ARGS ;;
-		list-servers)
+		ls|list-servers)
 			list_servers ;;
-		switch)
+		ss|switch-server)
 			switch_server $ARGS ;;
-		add-server)
+		as|add-server)
 			add_server $ARGS ;;
-		remove-server)
+		rs|remove-server)
 			remove_server $ARGS ;;
 		-h|--help)
 			help ;;
