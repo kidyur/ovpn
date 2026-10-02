@@ -1,4 +1,4 @@
-# ovpn — README
+# ovpn
 
 A small POSIX shell wrapper for managing **OpenVPN servers, users, and local credentials** from the command line. It keeps a list of your servers, tracks which one is "active", and lets you run common OpenVPN operations (add/list/revoke users) over SSH without memorizing paths or logging in manually.
 
